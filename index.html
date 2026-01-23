@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TrackMyPlate Pro</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        (function() {
+            const originalAudio = window.Audio;
+            window.Audio = function(url) {
+                const urlStr = (url || '').toString().toLowerCase();
+                if (urlStr.includes('.mp3') || urlStr.includes('.wav') || urlStr.includes('shizuku') || urlStr.includes('sounds')) {
+                    return { 
+                        play: () => Promise.resolve(), 
+                        pause: () => {}, 
+                        load: () => {}, 
+                        addEventListener: () => {},
+                        removeEventListener: () => {},
+                        currentTime: 0,
+                        duration: 0,
+                        paused: true,
+                        volume: 0,
+                        canPlayType: () => ''
+                    };
+                }
+                return new originalAudio(url);
+            };
+        })();
+    </script>
+
+    <script src="https://unpkg.com/live2d-widget/lib/L2Dwidget.min.js"></script>
+    
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Specific page styles - most are now in style.css */
+        .macro-card { transition: flex-grow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease; cursor: pointer; transform-origin: center; will-change: flex-grow; }
+        .macro-card:active { transform: scale(0.98); }
+        .macro-card.active { flex-grow: 3; background-color: #ffffff; border-color: #cbd5e1; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08); }
+        .macro-card.inactive { flex-grow: 1; opacity: 0.7; transform: scale(0.96); background-color: #f8fafc; border-color: transparent; }
+        .expanded-text { display: none; opacity: 0; transform: translateY(5px); transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s; }
+        .active .expanded-text { display: block; opacity: 1; transform: translateY(0); }
+
+        .trend-card { transition: all 0.3s ease; border: 1px solid transparent; cursor: pointer; }
+        .trend-card:active { transform: scale(0.95); }
+        .trend-card.active { background: #fff; border-color: #cbd5e1; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .trend-card.active .icon-box { background: #f1f5f9; color: #4f46e5; }
+        .trend-card.inactive { opacity: 0.5; background: #f8fafc; }
+
+        .nav-pill { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; white-space: nowrap; }
+        .nav-text { display: inline-block; opacity: 1; transition: opacity 0.2s 0.1s; }
+        .nav-pill.shrunk .nav-text { display: none; opacity: 0; }
+        .nav-pill.shrunk { width: 3rem; background: transparent; border-color: transparent; }
+        .nav-pill.expanded { flex-grow: 1; }
+
+        .skeleton { background: #e2e8f0; animation: pulse 1.5s infinite; border-radius: 12px; }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        
+        #export-dropdown { transition: all 0.2s ease-out; transform-origin: top right; }
+        #export-dropdown.hidden { opacity: 0; transform: scale(0.95); pointer-events: none; }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-900 antialiased select-none pb-32">
+
+    <div id="global-loader" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center transition-opacity duration-500">
+        <div class="relative mb-8 cursor-pointer group">
+            <div class="absolute inset-0 bg-indigo-50 rounded-full animate-ping opacity-75 duration-1000"></div>
+            <div class="absolute -inset-4 bg-indigo-50/50 rounded-full animate-pulse delay-75"></div>
+            <div class="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-indigo-200 relative z-10 transition-transform duration-300 hover:scale-105 hover:rotate-3">
+                <span id="loader-emoji" class="text-4xl animate-bounce">🥗</span>
+            </div>
+        </div>
+        <h1 class="text-3xl font-black text-slate-900 mb-2 tracking-tight">TrackMyPlate</h1>
+        <p id="loader-text" class="text-slate-400 font-bold text-sm tracking-wide animate-pulse">Initializing...</p>
+    </div>
+
+    <div id="auth-container" class="hidden min-h-screen flex items-center justify-center p-6 bg-white animate-enter">
+        <div class="text-center w-full max-w-md">
+            <div class="w-24 h-24 bg-indigo-600 rounded-[2rem] mx-auto flex items-center justify-center mb-8 shadow-2xl shadow-indigo-200 transform -rotate-6">
+                <i data-lucide="utensils" class="w-12 h-12 text-white"></i>
+            </div>
+            <h1 class="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">TrackMyPlate</h1>
+            <p class="text-slate-500 mb-10 text-lg">Your Personal AI Nutritionist</p>
+            <button id="google-signin-btn" class="w-full bg-slate-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-3 active:scale-95 transition shadow-xl hover:shadow-2xl">
+                <i data-lucide="chrome" class="w-6 h-6"></i> Continue with Google
+            </button>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden max-w-lg mx-auto p-5 relative">
+        <header class="flex justify-between items-end mb-4 pt-4 relative">
+            <div>
+                <div class="flex items-center gap-1 mb-2">
+                    <button onclick="changeDate(-1)" class="p-1 hover:bg-slate-200 rounded-full transition active:scale-90"><i data-lucide="chevron-left" class="w-4 h-4 text-slate-400"></i></button>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest min-w-[80px] text-center transition-all" id="current-date-display">TODAY</p>
+                    <button id="date-next-btn" onclick="changeDate(1)" class="p-1 hover:bg-slate-200 rounded-full transition active:scale-90"><i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i></button>
+                </div>
+                <div class="relative z-10">
+                    <p id="greeting-sub" class="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-0.5 flex items-center gap-1">GOOD MORNING ☀️</p>
+                    <h2 id="greeting-name" class="text-3xl font-black text-slate-900 tracking-tight leading-none">User</h2>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <div id="streak-container" class="hidden flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm transition-all hover:scale-105 cursor-pointer">
+                    <div class="flex items-center gap-1 text-orange-500 font-black">
+                        <i data-lucide="flame" class="w-4 h-4 fill-current"></i>
+                        <span id="streak-count">0</span>
+                    </div>
+                    <div id="freeze-container" class="flex items-center gap-1 text-cyan-400 font-bold border-l border-slate-100 pl-2 opacity-30">
+                        <i data-lucide="snowflake" class="w-4 h-4"></i>
+                        <span id="freeze-count">0</span>
+                    </div>
+                </div>
+
+                <button id="logout-btn" class="bg-white p-2.5 text-slate-400 border border-slate-100 shadow-sm hover:text-red-500 transition rounded-xl active:scale-95" title="Logout"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+            </div>
+        </header>
+
+        <div class="bg-white p-2 rounded-2xl shadow-sm border border-slate-100 mb-8 flex items-center justify-between z-10 relative">
+            <div class="flex gap-1">
+                 <button onclick="switchMainView('daily')" id="tab-daily" class="nav-pill expanded h-10 px-4 bg-indigo-600 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center justify-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4 flex-shrink-0"></i> <span class="nav-text">Daily</span></button>
+                 <button onclick="switchMainView('weekly')" id="tab-weekly" class="nav-pill shrunk h-10 px-0 text-slate-400 rounded-xl font-bold text-xs hover:text-indigo-600 transition shadow-sm flex items-center justify-center gap-2"><i data-lucide="bar-chart-2" class="w-4 h-4 flex-shrink-0"></i> <span class="nav-text">Trend</span></button>
+            </div>
+            <div class="flex items-center gap-1">
+                 <button id="edit-goals-btn" class="p-2.5 text-slate-400 hover:text-indigo-600 transition rounded-xl active:scale-95 hover:bg-slate-50" title="Edit Goals"><i data-lucide="settings-2" class="w-5 h-5"></i></button>
+                 <div class="w-px h-6 bg-slate-100 mx-1"></div>
+                 <div class="relative">
+                    <button id="export-toggle-btn" class="p-2.5 text-slate-400 hover:text-emerald-600 transition rounded-xl active:scale-95 hover:bg-slate-50" title="Export"><i data-lucide="download" class="w-5 h-5"></i></button>
+                    <div id="export-dropdown" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 transform origin-top-right z-30">
+                        <button id="export-csv-btn" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition text-left text-xs font-bold text-slate-700"><i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-500"></i> Export CSV</button>
+                        <button id="export-pdf-btn" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition text-left text-xs font-bold text-slate-700"><i data-lucide="file-text" class="w-4 h-4 text-rose-500"></i> Export PDF</button>
+                    </div>
+                 </div>
+            </div>
+        </div>
+
+        <div id="dashboard-skeleton" class="hidden space-y-5 animate-pulse">
+            <div class="flex gap-2 h-32"><div class="skeleton flex-1"></div><div class="skeleton flex-1"></div><div class="skeleton flex-1"></div></div>
+            <div class="skeleton h-52 w-full"></div>
+            <div class="skeleton h-24 w-full"></div>
+        </div>
+
+        <div id="view-dashboard-daily" class="space-y-5 animate-enter transition-all duration-300 ease-in-out origin-top">
+            
+            <div id="ai-companion-card" class="bg-white p-0 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden h-[340px] flex items-end justify-center transition-all duration-700 cursor-pointer">
+                
+                <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-indigo-50/50 to-transparent z-10 pointer-events-none"></div>
+
+                <div class="absolute top-6 left-6 z-20 pointer-events-none">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Companion</span>
+                    </div>
+                    <h3 class="text-xl font-black text-slate-900">Shizuku</h3>
+                </div>
+
+                <div id="waifu-dialogue" class="hidden absolute top-8 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm p-3 rounded-2xl shadow-xl border border-slate-100 z-30 max-w-[200px] text-xs font-medium text-slate-700 pointer-events-none animate-enter text-center">
+                    <p id="waifu-text">Welcome back!</p>
+                </div>
+
+                <div id="waifu-container" class="relative w-full h-full flex justify-center items-end z-10">
+                    </div>
+            </div>
+
+            <div class="flex gap-2 h-32" id="main-dashboard-container">
+                <div onclick="focusMacro('prot')" id="card-prot" class="macro-card flex-1 bg-white p-3.5 rounded-[1.5rem] shadow-sm border border-slate-100 flex flex-col justify-between overflow-hidden relative active">
+                    <span class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Protein</span>
+                    <div><p class="text-2xl font-black text-slate-900"><span id="val-prot">0</span>g</p><p class="text-[10px] text-slate-400 expanded-text mt-1 font-medium">Goal: <span id="goal-val-prot">0</span>g</p></div>
+                    <div class="w-full bg-emerald-50 h-1.5 rounded-full overflow-hidden"><div id="prog-prot" class="h-full bg-emerald-500 rounded-full" style="width: 0%"></div></div>
+                </div>
+                <div onclick="focusMacro('carb')" id="card-carb" class="macro-card flex-1 bg-white p-3.5 rounded-[1.5rem] shadow-sm border border-slate-100 flex flex-col justify-between overflow-hidden relative inactive">
+                    <span class="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Carbs</span>
+                    <div><p class="text-2xl font-black text-slate-900"><span id="val-carb">0</span>g</p><p class="text-[10px] text-slate-400 expanded-text mt-1 font-medium">Goal: <span id="goal-val-carb">0</span>g</p></div>
+                    <div class="w-full bg-amber-50 h-1.5 rounded-full overflow-hidden"><div id="prog-carb" class="h-full bg-amber-500 rounded-full" style="width: 0%"></div></div>
+                </div>
+                <div onclick="focusMacro('fat')" id="card-fat" class="macro-card flex-1 bg-white p-3.5 rounded-[1.5rem] shadow-sm border border-slate-100 flex flex-col justify-between overflow-hidden relative inactive">
+                    <span class="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Fat</span>
+                    <div><p class="text-2xl font-black text-slate-900"><span id="val-fat">0</span>g</p><p class="text-[10px] text-slate-400 expanded-text mt-1 font-medium">Goal: <span id="goal-val-fat">0</span>g</p></div>
+                    <div class="w-full bg-rose-50 h-1.5 rounded-full overflow-hidden"><div id="prog-fat" class="h-full bg-rose-500 rounded-full" style="width: 0%"></div></div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 h-52">
+                <div id="card-daily-cal" class="w-[65%] bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col justify-between relative overflow-hidden transition-transform hover:scale-[1.01] duration-300">
+                    <div class="relative z-10 h-full flex flex-col justify-between">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-xs font-bold text-indigo-500 uppercase tracking-wider">Calories</span>
+                                <div class="flex items-baseline gap-1 mt-1">
+                                    <h3 id="cals-remaining" class="text-4xl font-black text-slate-900 tracking-tight">0</h3>
+                                    <span class="text-sm font-bold text-slate-400">left</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="cals-eaten" class="text-base font-bold text-slate-700">0</span>
+                                <span class="text-xs text-slate-400 font-medium"> / <span id="cals-goal">2500</span></span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-100 h-4 rounded-full overflow-hidden">
+                            <div id="cals-progress" class="h-full bg-indigo-600 rounded-full transition-all duration-1000 shadow-lg shadow-indigo-200" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="card-daily-visual" class="w-[35%] bg-white p-2 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden transition-transform hover:scale-[1.02] duration-300 cursor-pointer active:scale-95 group">
+                    <div class="relative w-full h-full flex items-center justify-center">
+                        <canvas id="dailyDonut"></canvas>
+                        <div id="ring-center-text" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pop-in">MACROS</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-cyan-50 p-6 rounded-[1.5rem] border border-cyan-100 relative overflow-hidden transition-all hover:shadow-md hover:border-cyan-200 duration-300">
+                <div class="relative z-10 flex justify-between items-center">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1"><i data-lucide="droplets" class="w-4 h-4 text-cyan-600"></i><span class="text-xs font-bold text-cyan-600 uppercase tracking-wider">Hydration</span></div>
+                        <h3 class="text-2xl font-black text-cyan-900 tracking-tight"><span id="water-val">0</span> <span class="text-xs font-medium opacity-60">/ <span id="water-goal">3000</span>ml</span></h3>
+                    </div>
+                    <div class="flex gap-2" id="water-controls">
+                        <button onclick="addWater(-250)" class="bg-white text-cyan-600 p-3 rounded-xl shadow-sm hover:scale-105 transition active:scale-95"><i data-lucide="minus" class="w-5 h-5"></i></button>
+                        <button onclick="addWater(250)" class="bg-white text-cyan-600 p-3 rounded-xl shadow-sm hover:scale-105 transition active:scale-95"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                    </div>
+                </div>
+                <div id="water-fill" class="absolute bottom-0 left-0 w-full bg-cyan-200/50 transition-all duration-700" style="height: 0%"></div>
+            </div>
+
+            <div id="ai-passive-container" class="relative overflow-hidden rounded-[2rem] bg-indigo-900 p-6 border border-indigo-800 transition-transform hover:scale-[1.01] shadow-lg">
+                <div class="flex items-start gap-4">
+                    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-700/50 shadow-inner border border-indigo-500/30">
+                        <i data-lucide="zap" class="h-5 w-5 text-yellow-300 fill-yellow-300"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center mb-1">
+                            <h4 class="text-[10px] font-bold uppercase tracking-widest text-indigo-200">Coach Advice</h4>
+                            <button id="btn-refresh-ai" class="text-[10px] font-bold text-white bg-indigo-700 px-2 py-1 rounded hover:bg-indigo-600 transition">REFRESH</button>
+                        </div>
+                        <p id="passive-ai-message" class="text-sm font-medium text-white leading-relaxed">Analyzing your latest data...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="min-h-[200px]">
+                <h3 class="font-bold text-slate-900 mb-4 text-sm uppercase tracking-wide ml-2">Meals Log</h3>
+                <div id="food-list" class="space-y-3 pb-20"></div>
+            </div>
+        </div>
+
+        <div id="view-dashboard-weekly" class="hidden transition-all duration-300 ease-in-out origin-top space-y-6 opacity-0 translate-y-4">
+            <div class="flex flex-wrap gap-2">
+                <div onclick="switchChartMetric('calories')" id="trend-calories" class="trend-card active flex-1 p-3 rounded-2xl cursor-pointer flex flex-col items-center justify-center min-w-[70px]">
+                    <div class="icon-box w-8 h-8 rounded-full flex items-center justify-center mb-1 text-slate-400 bg-slate-100"><i data-lucide="flame" class="w-4 h-4"></i></div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Cal</span>
+                </div>
+                <div onclick="switchChartMetric('protein')" id="trend-protein" class="trend-card inactive flex-1 p-3 rounded-2xl cursor-pointer flex flex-col items-center justify-center min-w-[70px]">
+                    <div class="icon-box w-8 h-8 rounded-full flex items-center justify-center mb-1 text-slate-400 bg-slate-100"><i data-lucide="beef" class="w-4 h-4"></i></div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Pro</span>
+                </div>
+                <div onclick="switchChartMetric('carbs')" id="trend-carbs" class="trend-card inactive flex-1 p-3 rounded-2xl cursor-pointer flex flex-col items-center justify-center min-w-[70px]">
+                    <div class="icon-box w-8 h-8 rounded-full flex items-center justify-center mb-1 text-slate-400 bg-slate-100"><i data-lucide="wheat" class="w-4 h-4"></i></div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Carb</span>
+                </div>
+                <div onclick="switchChartMetric('fat')" id="trend-fat" class="trend-card inactive flex-1 p-3 rounded-2xl cursor-pointer flex flex-col items-center justify-center min-w-[70px]">
+                    <div class="icon-box w-8 h-8 rounded-full flex items-center justify-center mb-1 text-slate-400 bg-slate-100"><i data-lucide="droplet" class="w-4 h-4"></i></div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fat</span>
+                </div>
+                <div onclick="switchChartMetric('all')" id="trend-all" class="trend-card inactive flex-1 p-3 rounded-2xl cursor-pointer flex flex-col items-center justify-center min-w-[70px] border-indigo-100 bg-indigo-50">
+                    <div class="icon-box w-8 h-8 rounded-full flex items-center justify-center mb-1 text-indigo-500 bg-white"><i data-lucide="layers" class="w-4 h-4"></i></div>
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-indigo-600">All</span>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 h-96 relative">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-slate-900" id="chart-title">Weekly Overview</h3>
+                    <div class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">Avg: <span id="chart-avg">0</span></div>
+                </div>
+                <div class="relative h-64 w-full"><canvas id="weeklyChart"></canvas></div>
+                <div class="absolute opacity-0 pointer-events-none"><canvas id="pdfChartCanvas" width="800" height="400"></canvas></div>
+            </div>
+        </div>
+
+        <div id="chat-widget" class="fixed bottom-28 right-6 z-40 hidden">
+            <div class="slime-blob w-16 h-16 text-white text-2xl flex items-center justify-center shadow-2xl transition-transform hover:scale-105 active:scale-95" id="chat-btn">
+                <i data-lucide="message-circle" class="w-8 h-8"></i>
+            </div>
+            <div class="slime-message" id="chat-bubble-msg">Ask Shizuku!</div>
+        </div>
+
+        <button id="add-food-btn" class="hidden fixed bottom-6 right-6 bg-slate-900 text-white w-16 h-16 rounded-full shadow-2xl shadow-slate-400 flex items-center justify-center hover:scale-105 transition-all z-40 active:scale-90 ring-4 ring-slate-100">
+            <i data-lucide="plus" class="w-8 h-8"></i>
+        </button>
+
+    </div>
+
+    <div id="chat-modal" class="fixed bottom-32 right-6 w-96 bg-white rounded-[2rem] shadow-2xl border border-indigo-50 z-50 flex flex-col overflow-hidden closed max-h-[80vh] h-[650px]">
+        <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                    <i data-lucide="bot" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-white text-sm">Companion Shizuku</h4>
+                    <p class="text-[10px] text-indigo-100 font-medium flex items-center gap-1"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Online</p>
+                </div>
+            </div>
+            <button id="close-chat-btn" class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        
+        <div id="chat-history" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 relative no-scrollbar">
+            <div class="flex justify-start">
+                <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-xs text-slate-600 border border-slate-100 max-w-[85%]">
+                    👋 Hi! I'm Shizuku, your companion. I'm here to help you reach your goals!
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 bg-white border-t border-slate-100">
+            <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                <input type="text" id="chat-input" placeholder="Type a message..." class="flex-1 bg-transparent text-sm font-medium text-slate-700 placeholder:text-slate-400 outline-none px-2">
+                <button id="send-chat-btn" class="p-2 bg-indigo-600 text-white rounded-xl shadow-sm hover:scale-105 active:scale-95 transition flex-shrink-0">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="export-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-[70] backdrop-blur-sm p-4 animate-enter">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl relative">
+            <button onclick="closeExportModal()" class="absolute top-6 right-6 p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+            <h3 class="text-2xl font-black text-slate-900 mb-2">Export Data</h3>
+            <p class="text-slate-500 text-xs mb-8 font-bold uppercase tracking-wider">Select a time range</p>
+            <div class="space-y-3">
+                <button onclick="confirmExport(7)" class="w-full p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-indigo-500 hover:bg-indigo-50 flex justify-between items-center group transition-all shadow-sm"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600"><i data-lucide="calendar" class="w-5 h-5"></i></div><span class="font-bold text-slate-700 group-hover:text-indigo-700">Last 7 Days</span></div><i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-indigo-400"></i></button>
+                <button onclick="confirmExport(30)" class="w-full p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-indigo-500 hover:bg-indigo-50 flex justify-between items-center group transition-all shadow-sm"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600"><i data-lucide="calendar-days" class="w-5 h-5"></i></div><span class="font-bold text-slate-700 group-hover:text-indigo-700">Last 30 Days</span></div><i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-indigo-400"></i></button>
+                <button onclick="confirmExport(365)" class="w-full p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-indigo-500 hover:bg-indigo-50 flex justify-between items-center group transition-all shadow-sm"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600"><i data-lucide="archive" class="w-5 h-5"></i></div><span class="font-bold text-slate-700 group-hover:text-indigo-700">Last Year</span></div><i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-indigo-400"></i></button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="add-food-modal" class="fixed inset-0 bg-slate-900/60 hidden items-end sm:items-center justify-center z-50 backdrop-blur-sm p-4 animate-enter">
+        <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl h-[90vh] flex flex-col overflow-hidden">
+            <div class="flex justify-between items-center p-6 border-b border-slate-100 bg-white z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100">
+                        <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Add Entry</h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Select Method</p>
+                    </div>
+                </div>
+                <button id="close-modal-btn" class="p-2.5 text-slate-400 hover:bg-slate-50 rounded-full transition"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+
+            <div class="px-6 py-4 bg-white z-10" id="add-food-nav-container">
+                <div class="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-2xl">
+                    <button onclick="switchAddView('text')" class="nav-btn p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all"><i data-lucide="search" class="w-5 h-5"></i><span class="text-[9px] font-bold">Search</span></button>
+                    <button onclick="switchAddView('barcode')" class="nav-btn p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all"><i data-lucide="scan-barcode" class="w-5 h-5"></i><span class="text-[9px] font-bold">Scan</span></button>
+                    <button onclick="switchAddView('snap')" class="nav-btn p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all"><i data-lucide="camera" class="w-5 h-5"></i><span class="text-[9px] font-bold">Snap</span></button>
+                    <button onclick="resetAndOpenManual()" class="nav-btn p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all"><i data-lucide="edit-3" class="w-5 h-5"></i><span class="text-[9px] font-bold">Manual</span></button>
+                    <button onclick="startMealMatch()" class="nav-btn p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all"><i data-lucide="chef-hat" class="w-5 h-5 text-amber-500"></i><span class="text-[9px] font-bold">Chef</span></button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto relative px-6 pb-6">
+                <div id="view-energy" class="add-view hidden flex flex-col items-center justify-center h-full text-center p-6">
+                    <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mb-6 animate-bounce">
+                        <i data-lucide="zap" class="w-10 h-10 text-yellow-500 fill-yellow-500"></i>
+                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 mb-2">Meal Logged!</h3>
+                    <p class="text-slate-500 font-medium mb-8">How's your energy right now?</p>
+                    <div class="grid grid-cols-3 gap-4 w-full">
+                        <button onclick="logEnergy('low')" class="p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 hover:border-slate-300 transition group">
+                            <div class="text-3xl mb-2 grayscale group-hover:grayscale-0 transition">💤</div>
+                            <span class="text-xs font-bold text-slate-400 group-hover:text-slate-600">Low</span>
+                        </button>
+                        <button onclick="logEnergy('medium')" class="p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 hover:border-indigo-300 transition group">
+                             <div class="text-3xl mb-2 grayscale group-hover:grayscale-0 transition">😐</div>
+                             <span class="text-xs font-bold text-slate-400 group-hover:text-indigo-600">Med</span>
+                        </button>
+                        <button onclick="logEnergy('high')" class="p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 hover:border-yellow-400 transition group">
+                             <div class="text-3xl mb-2 grayscale group-hover:grayscale-0 transition">⚡</div>
+                             <span class="text-xs font-bold text-slate-400 group-hover:text-yellow-600">High</span>
+                        </button>
+                    </div>
+                    <button onclick="skipEnergy()" class="mt-8 text-slate-400 font-bold text-xs hover:text-slate-600">Skip</button>
+                </div>
+
+                <div id="view-text" class="add-view h-full">
+                    <div class="relative mb-4">
+                        <i data-lucide="search" class="absolute left-4 top-4 w-5 h-5 text-slate-400"></i>
+                        <input type="text" id="text-search-input" placeholder="Search for food (e.g. 'Avocado Toast')..." class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-4 py-4 font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm placeholder:text-slate-400">
+                    </div>
+                    <div id="text-results" class="space-y-2 pb-20"></div>
+                    <div id="text-selection-popup" class="absolute inset-0 bg-white z-20 hidden flex-col animate-enter">
+                        <div class="flex-1 flex flex-col justify-center items-center text-center">
+                            <div class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-6 shadow-sm"><i data-lucide="utensils" class="w-10 h-10 text-indigo-600"></i></div>
+                            <h4 id="popup-food-name" class="text-3xl font-black text-slate-900 mb-2 px-4">...</h4>
+                            <p id="popup-food-cals" class="text-lg text-slate-500 font-medium mb-8">...</p>
+                            <div class="flex items-center gap-6 mb-8">
+                                <button onclick="adjustTextServing(-0.5)" class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 font-bold text-2xl hover:bg-slate-100 transition text-slate-600">-</button>
+                                <input type="number" id="popup-servings" value="1" class="w-20 text-center text-4xl font-black outline-none text-slate-800" readonly>
+                                <button onclick="adjustTextServing(0.5)" class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 font-bold text-2xl hover:bg-slate-100 transition text-slate-600">+</button>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 p-6 pt-0">
+                            <button onclick="closeTextPopup()" class="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition">Cancel</button>
+                            <button id="popup-add-btn" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:scale-[1.02] transition">Add Meal</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="view-barcode" class="add-view hidden">
+                    <div id="scanner-container" class="w-full h-64 bg-black rounded-3xl overflow-hidden relative mb-4 shadow-inner ring-4 ring-slate-100"><div id="reader" class="w-full h-full"></div></div>
+                    <p id="barcode-status" class="text-center text-slate-500 font-bold text-sm mb-4 min-h-[20px]"></p>
+                    <div id="barcode-result" class="hidden p-6 bg-emerald-50 border border-emerald-100 rounded-3xl animate-enter">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center"><i data-lucide="check" class="w-4 h-4 text-emerald-600"></i></div>
+                            <p class="font-bold text-emerald-800 text-lg">Product Found!</p>
+                        </div>
+                        <p id="barcode-product-name" class="text-emerald-700 mb-6 font-medium ml-1">...</p>
+                        <div class="flex gap-3">
+                            <input type="number" id="barcode-servings" value="1" min="0.5" step="0.5" class="w-20 p-3 rounded-xl font-bold text-center border border-emerald-200 shadow-sm text-emerald-900 bg-white">
+                            <button id="add-barcode-btn" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 hover:scale-[1.02] transition">Add Meal</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="view-snap" class="add-view hidden">
+                    <div id="snap-upload-area" class="text-center py-12 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50 hover:bg-slate-100 transition cursor-pointer group">
+                        <input type="file" id="snap-input" accept="image/*" capture="environment" class="hidden">
+                        <label for="snap-input" class="cursor-pointer block">
+                            <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform"><i data-lucide="camera" class="w-8 h-8 text-indigo-500"></i></div>
+                            <span class="font-bold text-slate-600 text-lg block" id="snap-btn-text">Tap to Snap Food</span>
+                            <span class="text-xs text-slate-400 font-medium mt-1">AI will identify calories & macros</span>
+                        </label>
+                    </div>
+                    <div id="snap-result-area" class="hidden space-y-4 animate-enter">
+                        <img id="snap-preview-img" class="w-full h-56 object-cover rounded-[2rem] shadow-sm ring-4 ring-slate-100">
+                        <div class="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100">
+                            <h4 id="snap-food-name" class="font-black text-indigo-900 text-2xl mb-1">...</h4>
+                            <p id="snap-food-cals" class="text-indigo-600 font-bold text-lg">...</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <input type="number" id="snap-servings" value="1" class="w-24 p-4 rounded-2xl font-bold text-center border border-slate-200 bg-white text-xl">
+                            <button id="confirm-snap-btn" class="flex-1 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl shadow-indigo-200 hover:scale-[1.02] transition">Log Meal</button>
+                        </div>
+                        <button onclick="resetSnapView()" class="w-full py-4 text-slate-400 font-bold hover:text-slate-600 transition text-sm">Retake Photo</button>
+                    </div>
+                </div>
+                <div id="view-manual" class="add-view hidden space-y-4">
+                    <input type="text" id="manual-name" class="w-full bg-slate-50 border border-slate-100 p-5 rounded-2xl font-bold text-lg focus:ring-2 focus:ring-slate-200 outline-none transition placeholder:text-slate-300" placeholder="Food Name">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="number" id="manual-cals" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold placeholder:text-slate-300 focus:bg-white focus:shadow-sm outline-none transition" placeholder="Calories" min="0">
+                        <input type="number" id="manual-prot" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold placeholder:text-slate-300 focus:bg-white focus:shadow-sm outline-none transition" placeholder="Prot (g)" min="0">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="number" id="manual-carb" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold placeholder:text-slate-300 focus:bg-white focus:shadow-sm outline-none transition" placeholder="Carbs (g)" min="0">
+                        <input type="number" id="manual-fat" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold placeholder:text-slate-300 focus:bg-white focus:shadow-sm outline-none transition" placeholder="Fat (g)" min="0">
+                    </div>
+                    <div class="flex items-center gap-3 bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+                        <span class="text-xs font-bold text-slate-400 uppercase flex-1 ml-2 tracking-wider">Servings</span>
+                        <input type="number" id="manual-servings" value="1" min="0.5" step="0.5" class="w-24 bg-white p-3 rounded-xl font-bold text-center shadow-sm text-slate-700 outline-none" oninput="this.value = Math.max(0.1, this.value)">
+                    </div>
+                    <button id="manual-add-btn" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold shadow-xl hover:scale-[1.02] transition">Save Meal</button>
+                    <div>
+                        <h4 class="font-bold text-slate-400 text-xs uppercase mb-3 mt-4 ml-1 tracking-wider">Recently Added</h4>
+                        <div id="recent-meals-list" class="space-y-2 pb-20"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="edit-goals-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 backdrop-blur-sm p-4 animate-enter">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl">
+            <h3 class="text-2xl font-black text-slate-900 mb-6">Daily Goals</h3>
+            <div class="space-y-4 mb-8">
+                <div><label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Calories</label><input type="number" id="edit-goal-cals" class="w-full bg-slate-50 p-4 rounded-xl mt-1 font-bold text-lg" min="500"></div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="text-[10px] font-bold text-emerald-500 uppercase">Prot</label><input type="number" id="edit-goal-prot" class="w-full bg-slate-50 p-3 rounded-xl mt-1 font-bold" min="0"></div>
+                    <div><label class="text-[10px] font-bold text-amber-500 uppercase">Carb</label><input type="number" id="edit-goal-carb" class="w-full bg-slate-50 p-3 rounded-xl mt-1 font-bold" min="0"></div>
+                    <div><label class="text-[10px] font-bold text-rose-500 uppercase">Fat</label><input type="number" id="edit-goal-fat" class="w-full bg-slate-50 p-3 rounded-xl mt-1 font-bold" min="0"></div>
+                </div>
+                <div><label class="text-xs font-bold text-cyan-500 uppercase tracking-wider">Water (ml)</label><input type="number" id="edit-goal-water" class="w-full bg-slate-50 p-4 rounded-xl mt-1 font-bold" min="0"></div>
+                
+                <div class="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-100 mt-4">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white p-2 rounded-full text-emerald-600"><i data-lucide="leaf" class="w-5 h-5"></i></div>
+                        <span class="font-bold text-slate-700 text-sm">Vegetarian Mode</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="edit-goal-veg" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                </div>
+
+            </div>
+            <div class="flex gap-3"><button id="close-goals-btn" class="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition">Cancel</button><button id="save-goals-btn" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:scale-[1.02] transition">Save</button></div>
+        </div>
+    </div>
+
+    <div id="meal-match-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-[60] backdrop-blur-sm p-6 animate-enter">
+        <div class="w-full max-w-sm relative">
+            
+            <div id="card-stack" class="relative h-[450px] w-full perspective-1000">
+                <div id="card-loader" class="absolute inset-0 bg-white rounded-[2rem] flex flex-col items-center justify-center shadow-2xl">
+                    <div class="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center animate-bounce mb-4">
+                        <span class="text-4xl">👨‍🍳</span>
+                    </div>
+                    <p class="text-slate-500 font-bold text-sm">Chef shizuku is thinking...</p>
+                </div>
+            </div>
+            
+            <div class="absolute -bottom-24 left-0 right-0 flex justify-center gap-8">
+                <button onclick="swipeCard('left')" class="w-16 h-16 bg-white text-rose-500 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-90 transition border border-rose-100"><i data-lucide="x" class="w-8 h-8"></i></button>
+                <button onclick="swipeCard('right')" class="w-16 h-16 bg-gradient-to-tr from-emerald-400 to-emerald-600 text-white rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-90 transition shadow-emerald-200"><i data-lucide="heart" class="w-8 h-8 fill-current"></i></button>
+            </div>
+            
+            <button onclick="closeMealMatch()" class="absolute -top-12 right-0 text-white/80 hover:text-white"><i data-lucide="x-circle" class="w-8 h-8"></i></button>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+    <script>
+        // UI Helpers (Classic)
+        window.focusMacro = (type) => { 
+            const arr = ['prot', 'carb', 'fat'];
+            if(window.lastFocused === type) { window.lastFocused = null; arr.forEach(t => document.getElementById(`card-${t}`).classList.remove('active', 'inactive')); return; }
+            window.lastFocused = type; arr.forEach(t => { const c = document.getElementById(`card-${t}`); if(t === type) { c.classList.add('active'); c.classList.remove('inactive'); } else { c.classList.add('inactive'); c.classList.remove('active'); } });
+        };
+        window.switchAddView = (viewName) => { 
+            document.querySelectorAll('.nav-btn').forEach(btn => { 
+                // Enhanced check: Handle Icon + Text structure
+                if(btn.onclick.toString().includes(viewName)) {
+                    btn.className = "nav-btn p-3 rounded-xl flex flex-col items-center gap-1.5 bg-white shadow-sm text-indigo-600 ring-1 ring-black/5 transition-all"; 
+                } else {
+                    btn.className = "nav-btn p-3 rounded-xl flex flex-col items-center gap-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-all"; 
+                }
+            }); 
+            document.querySelectorAll('.add-view').forEach(el => el.classList.add('hidden')); 
+            document.getElementById(`view-${viewName}`).classList.remove('hidden'); 
+            
+            // New Mood Logic: Hide nav if showing Mood/Energy view
+            const navContainer = document.getElementById('add-food-nav-container');
+            if(viewName === 'energy') {
+                 if(navContainer) navContainer.style.display = 'none';
+            } else {
+                 if(navContainer) navContainer.style.display = 'block';
+            }
+
+            if(viewName!=='barcode' && window.html5QrCode){window.html5QrCode.stop().catch(()=>{});window.html5QrCode=null;} 
+            if(viewName==='barcode') resetBarcodeScanner(); 
+            if(viewName==='manual' && window.renderRecentMeals) window.renderRecentMeals();
+        };
+
+        // Export Modal Helpers
+        document.getElementById('export-toggle-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('export-dropdown').classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => document.getElementById('export-dropdown').classList.add('hidden'));
+
+        window.closeExportModal = () => {
+            document.getElementById('export-modal').classList.add('hidden');
+            document.getElementById('export-modal').classList.remove('flex');
+        };
+        
+        window.confirmExport = (days) => {
+            document.dispatchEvent(new CustomEvent('confirm-export-data', { detail: days }));
+            window.closeExportModal();
+        };
+
+        // Standard Helpers
+        window.resetAndOpenManual = () => { ['manual-name','manual-cals','manual-prot','manual-carb','manual-fat'].forEach(id=>document.getElementById(id).value=''); document.getElementById('manual-servings').value="1"; window.switchAddView('manual'); };
+        window.resetBarcodeScanner = () => { 
+            document.getElementById('barcode-result').classList.add('hidden'); 
+            document.getElementById('scanner-container').classList.remove('hidden'); 
+            const statusEl = document.getElementById('barcode-status');
+            if(statusEl) statusEl.textContent = ""; 
+
+            if(!window.html5QrCode) window.html5QrCode = new Html5Qrcode("reader"); 
+            setTimeout(() => { 
+                window.html5QrCode.start({facingMode:"environment"}, {fps:10, qrbox:{width:250,height:250}}, (txt)=>{
+                    window.html5QrCode.stop(); 
+                    document.dispatchEvent(new CustomEvent('barcode-scanned',{detail:txt}));
+                }, ()=>{}).catch(e=>{}); 
+            }, 300); 
+        };
+        window.resetSnapView = () => { document.getElementById('snap-result-area').classList.add('hidden'); document.getElementById('snap-upload-area').classList.remove('hidden'); document.getElementById('snap-input').value = ""; document.getElementById('snap-btn-text').textContent = "Tap to Snap"; };
+        window.closeTextPopup = () => { document.getElementById('text-selection-popup').classList.add('hidden'); document.getElementById('text-selection-popup').classList.remove('flex'); };
+        window.adjustTextServing = (delta) => { const el=document.getElementById('popup-servings'); let val=parseFloat(el.value)+delta; if(val<0.5)val=0.5; el.value=val; };
+        
+        // --- SMOOTH TRANSITION SWITCHER ---
+        window.switchMainView = (v) => { 
+            const daily = document.getElementById('view-dashboard-daily'); 
+            const weekly = document.getElementById('view-dashboard-weekly'); 
+            const dailyTab = document.getElementById('tab-daily'); 
+            const weeklyTab = document.getElementById('tab-weekly');
+            
+            const activeClass = "nav-pill expanded h-10 px-4 bg-indigo-600 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center justify-center gap-2";
+            const inactiveClass = "nav-pill shrunk h-10 px-0 bg-white text-slate-400 border border-slate-100 rounded-xl font-bold text-xs hover:text-indigo-600 transition shadow-sm flex items-center justify-center gap-2";
+
+            if((v === 'daily' && !daily.classList.contains('hidden')) || (v === 'weekly' && !weekly.classList.contains('hidden'))) return;
+
+            if(v === 'daily') {
+                weekly.classList.add('opacity-0', 'translate-y-4');
+                weekly.classList.remove('animate-enter');
+                setTimeout(() => {
+                    weekly.classList.add('hidden');
+                    daily.classList.remove('hidden', 'opacity-0', 'translate-y-4');
+                    daily.classList.add('animate-enter'); 
+                }, 300); 
+                dailyTab.className = activeClass;
+                weeklyTab.className = inactiveClass;
+            } else {
+                daily.classList.add('opacity-0', 'translate-y-4');
+                daily.classList.remove('animate-enter');
+                setTimeout(() => {
+                    daily.classList.add('hidden');
+                    weekly.classList.remove('hidden', 'opacity-0', 'translate-y-4');
+                    weekly.classList.add('animate-enter'); 
+                    document.dispatchEvent(new Event('load-weekly-chart'));
+                }, 300);
+                weeklyTab.className = activeClass;
+                dailyTab.className = inactiveClass;
+            }
+        };
+
+        window.changeDate = (delta) => document.dispatchEvent(new CustomEvent('change-dashboard-date', { detail: delta }));
+        window.switchChartMetric = (metric) => document.dispatchEvent(new CustomEvent('change-chart-metric', { detail: metric }));
+        window.switchChartTime = (days) => document.dispatchEvent(new CustomEvent('change-chart-time', { detail: days }));
+        
+        // Interactive Loader Logic
+        const loaderEmojis = ['🥗', '🥑', '🥕', '🍎', '🥩', '🍋', '🍱'];
+        const loaderTips = ['Loading your personalized plan...', 'Calculating macros...', 'Preparing healthy tips...', 'Checking water levels...', 'Getting the kitchen ready...'];
+        let loaderStep = 0;
+        const loaderInterval = setInterval(() => {
+            const emojiEl = document.getElementById('loader-emoji');
+            const textEl = document.getElementById('loader-text');
+            if(emojiEl && textEl) {
+                emojiEl.innerText = loaderEmojis[loaderStep % loaderEmojis.length];
+                textEl.innerText = loaderTips[loaderStep % loaderTips.length];
+                loaderStep++;
+            }
+        }, 800);
+        window.addEventListener('load', () => { 
+            setTimeout(() => {
+                clearInterval(loaderInterval);
+                const loader = document.getElementById('global-loader');
+                if(loader) {
+                    loader.classList.add('opacity-0', 'pointer-events-none');
+                    setTimeout(() => loader.remove(), 500);
+                }
+            }, 2500); 
+            if(window.lucide) lucide.createIcons(); 
+        });
+        
+        // Added UI logic for Mood Skipping (JS will handle the rest)
+        window.skipEnergy = () => {
+             document.getElementById('add-food-modal').classList.add('hidden');
+             document.getElementById('add-food-modal').classList.remove('flex');
+             window.switchAddView('text'); // Reset for next time
+        }
+        window.logEnergy = (level) => {
+             document.dispatchEvent(new CustomEvent('energy-logged', { detail: level }));
+             // Close modal handled in app.js
+        }
+        
+        // Meal Match Logic Handlers
+        window.startMealMatch = () => {
+             document.dispatchEvent(new CustomEvent('start-meal-match'));
+        }
+        window.closeMealMatch = () => {
+             document.getElementById('meal-match-modal').classList.add('hidden');
+             document.getElementById('meal-match-modal').classList.remove('flex');
+        }
+        window.swipeCard = (dir) => {
+             document.dispatchEvent(new CustomEvent('meal-swipe', { detail: dir }));
+        }
+    </script>
+</body>
+</html>
