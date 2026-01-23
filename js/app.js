@@ -242,10 +242,69 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btns.popupAdd) { btns.popupAdd.addEventListener('click', () => { if(pendingFoodItem) { const s = Math.max(0.1, Number(getEl('popup-servings').value)||1); const final = { name: pendingFoodItem.name, calories: Math.max(0, Math.round(pendingFoodItem.calories*s)), protein: Math.max(0, Math.round((pendingFoodItem.protein||0)*s)), carbs: Math.max(0, Math.round((pendingFoodItem.carbs||0)*s)), fat: Math.max(0, Math.round((pendingFoodItem.fat||0)*s)) }; saveFood(final); getEl('text-selection-popup').classList.add('hidden'); getEl('text-selection-popup').classList.remove('flex'); getEl('text-search-input').value = ""; getEl('text-results').innerHTML = ""; } }); }
     if(btns.snapInput) { btns.snapInput.addEventListener('change', async (e) => { const file = e.target.files[0]; if(!file) return; const status = getEl('snap-status'); btns.snapInput.disabled = true; if(status) status.textContent = "Analyzing..."; const reader = new FileReader(); reader.readAsDataURL(file); reader.onloadend = async () => { try { const item = await identifyFoodFromImage(reader.result); pendingFoodItem = item; getEl('snap-upload-area').classList.add('hidden'); getEl('snap-result-area').classList.remove('hidden'); getEl('snap-preview-img').src = reader.result; getEl('snap-food-name').textContent = item.name; getEl('snap-food-cals').textContent = `${item.calories} kcal`; } catch(e){ console.log(e); } finally { btns.snapInput.disabled = false; } }; }); }
     if(btns.snapConfirm) { btns.snapConfirm.addEventListener('click', () => { if(pendingFoodItem) { const s = Math.max(0.1, Number(getEl('snap-servings').value)||1); const final = { name: pendingFoodItem.name, calories: Math.max(0, Math.round(pendingFoodItem.calories*s)), protein: Math.max(0, Math.round((pendingFoodItem.protein||0)*s)), carbs: Math.max(0, Math.round((pendingFoodItem.carbs||0)*s)), fat: Math.max(0, Math.round((pendingFoodItem.fat||0)*s)) }; saveFood(final, false); window.resetSnapView(); } }); }
-    if(btns.barcodeAdd) { btns.barcodeAdd.addEventListener('click', () => { if(pendingFoodItem) { const servings = Number(getEl('barcode-servings').value) || 1; const finalFood = { name: pendingFoodItem.name, calories: Math.round(pendingFoodItem.calories * servings), protein: Math.round(pendingFoodItem.protein * servings) }; saveFood(finalFood, false); alert(`Added ${servings} serving(s)!`); window.resetBarcodeScanner(); } }); }
+    
+    // UPDATED: Barcode Add Button Logic
+    if(btns.barcodeAdd) { 
+        btns.barcodeAdd.addEventListener('click', () => { 
+            if(pendingFoodItem) { 
+                const servings = Number(getEl('barcode-servings').value) || 1; 
+                // Changed: Added carbs and fat calculation
+                const finalFood = { 
+                    name: pendingFoodItem.name, 
+                    calories: Math.round(pendingFoodItem.calories * servings), 
+                    protein: Math.round(pendingFoodItem.protein * servings),
+                    carbs: Math.round((pendingFoodItem.carbs || 0) * servings),
+                    fat: Math.round((pendingFoodItem.fat || 0) * servings)
+                }; 
+                saveFood(finalFood, false); 
+                alert(`Added ${servings} serving(s)!`); 
+                window.resetBarcodeScanner(); 
+            } 
+        }); 
+    }
 
-    // Barcode Listener
-    document.addEventListener('barcode-scanned', async (e) => { const barcode = e.detail; const status = getEl('barcode-status'); getEl('scanner-container').classList.add('hidden'); if(status) status.textContent = "Fetching product details..."; try { const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`); const data = await response.json(); if (data.status === 1) { const product = data.product; const name = product.product_name || "Unknown Product"; const cals = product.nutriments['energy-kcal_100g'] || product.nutriments['energy-kcal'] || 0; const prot = product.nutriments['proteins_100g'] || 0; pendingFoodItem = { name: name, calories: Math.round(cals), protein: Math.round(prot) }; getEl('barcode-result').classList.remove('hidden'); getEl('barcode-product-name').textContent = `${name} (${Math.round(cals)} cal/100g)`; getEl('barcode-servings').value = 1; if(status) status.textContent = ""; } else { if(status) status.textContent = "Product not found. Try again."; getEl('scanner-container').classList.remove('hidden'); } } catch (err) { if(status) status.textContent = "API Error. Try again."; getEl('scanner-container').classList.remove('hidden'); } });
+    // UPDATED: Barcode Listener
+    document.addEventListener('barcode-scanned', async (e) => { 
+        const barcode = e.detail; 
+        const status = getEl('barcode-status'); 
+        getEl('scanner-container').classList.add('hidden'); 
+        if(status) status.textContent = "Fetching product details..."; 
+        
+        try { 
+            const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`); 
+            const data = await response.json(); 
+            
+            if (data.status === 1) { 
+                const product = data.product; 
+                const name = product.product_name || "Unknown Product"; 
+                // Changed: Added fetching logic for carbs and fat
+                const cals = product.nutriments['energy-kcal_100g'] || product.nutriments['energy-kcal'] || 0; 
+                const prot = product.nutriments['proteins_100g'] || 0; 
+                const carbs = product.nutriments['carbohydrates_100g'] || 0; 
+                const fat = product.nutriments['fat_100g'] || 0; 
+
+                // Changed: Added carbs and fat to pending object
+                pendingFoodItem = { 
+                    name: name, 
+                    calories: Math.round(cals), 
+                    protein: Math.round(prot),
+                    carbs: Math.round(carbs),
+                    fat: Math.round(fat)
+                }; 
+                
+                getEl('barcode-result').classList.remove('hidden'); 
+                getEl('barcode-product-name').textContent = `${name} (${Math.round(cals)} cal/100g)`; 
+                getEl('barcode-servings').value = 1; 
+                if(status) status.textContent = ""; 
+            } else { 
+                if(status) status.textContent = "Product not found. Try again."; 
+                getEl('scanner-container').classList.remove('hidden'); 
+            } 
+        } catch (err) { 
+            if(status) status.textContent = "API Error. Try again."; 
+            getEl('scanner-container').classList.remove('hidden'); 
+        } 
+    });
 
     // --- ENERGY / MOOD LOGGING ---
     document.addEventListener('energy-logged', async (e) => {
