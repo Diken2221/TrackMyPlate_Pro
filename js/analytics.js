@@ -1,9 +1,17 @@
-const GROQ_API_KEY = "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"; 
+import { CONFIG } from './config.js';
 
+// Get Key from central config
+const GROQ_API_KEY = CONFIG.GROQ_API_KEY; 
 const BASE_PROMPT = "Return ONLY valid JSON: {\"name\": \"Short Name\", \"calories\": 0, \"protein\": 0, \"carbs\": 0, \"fat\": 0}. No markdown.";
 
 // Updated: Accepts preferences for Vegetarian Mode
 export async function updateAICoach(currentLog, goals, user, preferences = {}) {
+    // Safety check for missing key
+    if (!GROQ_API_KEY || GROQ_API_KEY.includes("YOUR_GROQ")) {
+        console.warn("AI Error: No API Key provided in config.js");
+        return;
+    }
+
     const aiTextElement = document.getElementById('passive-ai-message');
     if (!aiTextElement) return;
 
@@ -113,7 +121,7 @@ export async function chatWithCoach(userMessage, currentLog, goals, user, prefer
 
     // 4. Construct the System Prompt
     const systemPrompt = `
-    You are shizuku, the AI core of "TrackMyPlate".
+    You are Nova, the AI core of "TrackMyPlate".
     
     USER CONTEXT:
     - Name: ${userName}
