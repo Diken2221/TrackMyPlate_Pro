@@ -2,35 +2,39 @@
 
 export const CONFIG = {
     // -------------------------------------------------------------------------
-    // FLIPPA BUYER: REPLACE THESE VALUES WITH YOUR OWN API KEYS
+    // INSTRUCTIONS FOR BUYER:
+    // 1. Go to console.firebase.google.com -> Create Project -> Web App
+    // 2. Paste your Firebase config object below.
     // -------------------------------------------------------------------------
     
-    // 1. Firebase Configuration (From Firebase Console)
     FIREBASE: {
-       apiKey: "AIzaSyAfZ9TtlMIiVFNyBHoP5bJB5B6M8TL1IG8",
-       authDomain: "trackmyplate-v.firebaseapp.com",
-       projectId: "trackmyplate-v",
-       storageBucket: "trackmyplate-v.firebasestorage.app",
-       messagingSenderId: "89027611787",
-       appId: "1:89027611787:web:1e78281964d16afaabd88e",
-       measurementId: "G-WRTZ5WXPCT"
+       apiKey: "YOUR_FIREBASE_API_KEY_HERE",
+       authDomain: "YOUR_APP.firebaseapp.com",
+       projectId: "YOUR_PROJECT_ID",
+       storageBucket: "YOUR_APP.firebasestorage.app",
+       messagingSenderId: "YOUR_SENDER_ID",
+       appId: "YOUR_APP_ID",
+       measurementId: "G-MEASUREMENT_ID"
     },
 
-    // 2. Google Gemini AI Key (For Food Analysis & Easy Maker)
-    GEMINI_API_KEY: "AIzaSyB4A63BBj9mRkXUDLPCw8g2-mqcnQVq-X4",
+    // -------------------------------------------------------------------------
+    // 2. AI CONFIGURATION
+    // Get a free key from: https://console.groq.com/keys
+    // -------------------------------------------------------------------------
+    GROQ_API_KEY: "gsk_YOUR_GROQ_API_KEY_HERE",
 
     // -------------------------------------------------------------------------
     // APP SETTINGS
     // -------------------------------------------------------------------------
     APP_NAME: "TrackMyPlate",
-    VERSION: "2.0.0",
+    VERSION: "2.1.0",
     
-    // Default goals for a new user (Targeting Weight Gain)
-    DEFAULT_GOALS: {
-        calories: 2500, // Surplus for weight gain
-        protein: 60,    // High protein for muscle
-        carbs: 350,     // Energy
-        fat: 80,        // Healthy fats
-        water: 3000     // 3 Liters
+    // Default goals for a new user
+    DEFAULT_GOALS: { 
+        calories: 2500, 
+        protein: 150, 
+        carbs: 250, 
+        fat: 80, 
+        water: 3000 
     }
 };
