@@ -21,7 +21,7 @@ export const CONFIG = {
     // 2. AI CONFIGURATION
     // Get a free key from: https://console.groq.com/keys
     // -------------------------------------------------------------------------
-    GROQ_API_KEY: "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",
+    GROQ_API_KEY: "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",
 
     // -------------------------------------------------------------------------
     // APP SETTINGS
@@ -38,5 +38,6 @@ export const CONFIG = {
         water: 3000 
     }
 };
+
 
 
