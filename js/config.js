@@ -8,20 +8,20 @@ export const CONFIG = {
     // -------------------------------------------------------------------------
     
     FIREBASE: {
-       apiKey: "YOUR_FIREBASE_API_KEY_HERE",
-       authDomain: "YOUR_APP.firebaseapp.com",
-       projectId: "YOUR_PROJECT_ID",
-       storageBucket: "YOUR_APP.firebasestorage.app",
-       messagingSenderId: "YOUR_SENDER_ID",
-       appId: "YOUR_APP_ID",
-       measurementId: "G-MEASUREMENT_ID"
+       apiKey: "AIzaSyAfZ9TtlMIiVFNyBHoP5bJB5B6M8TL1IG8",
+       authDomain: "trackmyplate-v.firebaseapp.com",
+       projectId: "trackmyplate-v",
+       storageBucket: "trackmyplate-v.firebasestorage.app",
+       messagingSenderId: "89027611787",
+       appId: "1:89027611787:web:1e78281964d16afaabd88e",
+       measurementId: "G-WRTZ5WXPCT"
     },
 
     // -------------------------------------------------------------------------
     // 2. AI CONFIGURATION
     // Get a free key from: https://console.groq.com/keys
     // -------------------------------------------------------------------------
-    GROQ_API_KEY: "gsk_YOUR_GROQ_API_KEY_HERE",
+    GROQ_API_KEY: "j4vp02EoEEKDLca9NmD16CzkUYi5CozKQkXlPHzDbjN0iJvuz2QkIgazVSJE4MIbA8LyxTWR386PXbRB",
 
     // -------------------------------------------------------------------------
     // APP SETTINGS
@@ -38,3 +38,4 @@ export const CONFIG = {
         water: 3000 
     }
 };
+
