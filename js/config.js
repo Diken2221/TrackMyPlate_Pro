@@ -7,20 +7,20 @@ export const CONFIG = {
 
 
     FIREBASE: {
-        apiKey: "AIzaSyAfZ9TtlMIiVFNyBHoP5bJB5B6M8TL1IG8",
-        authDomain: "trackmyplate-v.firebaseapp.com",
-        projectId: "trackmyplate-v",
-      storageBucket: "trackmyplate-v.firebasestorage.app",
-      messagingSenderId: "89027611787",
-      appId: "1:89027611787:web:1e78281964d16afaabd88e",
-      measurementId: "G-WRTZ5WXPCT"
+       apiKey: "YOUR_FIREBASE_API_KEY_HERE",
+       authDomain: "YOUR_APP.firebaseapp.com",
+       projectId: "YOUR_PROJECT_ID",
+       storageBucket: "YOUR_APP.firebasestorage.app",
+       messagingSenderId: "YOUR_SENDER_ID",
+       appId: "YOUR_APP_ID",
+       measurementId: "G-MEASUREMENT_ID"
     },
 
     // -------------------------------------------------------------------------
     // 2. AI CONFIGURATION
     // Get a free key from: https://console.groq.com/keys
     // -------------------------------------------------------------------------
-    GROQ_API_KEY: "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",
+    GROQ_API_KEY: "gsk_YOUR_GROQ_API_KEY_HERE",
 
     // -------------------------------------------------------------------------
     // APP SETTINGS
@@ -31,10 +31,6 @@ export const CONFIG = {
     // Default goals for a new user
     DEFAULT_GOALS: { 
         calories: 2500, 
-        protein: 150, 
-        carbs: 250, 
-        fat: 80, 
         water: 3000 
     }
 };
-
