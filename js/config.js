@@ -37,3 +37,4 @@ export const CONFIG = {
         water: 3000 
     }
 };
+
