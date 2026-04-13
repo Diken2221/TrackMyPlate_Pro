@@ -7,16 +7,15 @@ export const CONFIG = {
 
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAfZ9TtlMIiVFNyBHoP5bJB5B6M8TL1IG8",
-  authDomain: "trackmyplate-v.firebaseapp.com",
-  projectId: "trackmyplate-v",
-  storageBucket: "trackmyplate-v.firebasestorage.app",
-  messagingSenderId: "89027611787",
-  appId: "1:89027611787:web:1e78281964d16afaabd88e",
-  measurementId: "G-WRTZ5WXPCT"
-},
-
+ FIREBASE: {
+      apiKey: "AIzaSyAfZ9TtlMIiVFNyBHoP5bJB5B6M8TL1IG8",
+      authDomain: "trackmyplate-v.firebaseapp.com",
+      projectId: "trackmyplate-v",
+      storageBucket: "trackmyplate-v.firebasestorage.app",
+      messagingSenderId: "89027611787",
+      appId: "1:89027611787:web:1e78281964d16afaabd88e",
+      measurementId: "G-WRTZ5WXPCT"
+    },
     // -------------------------------------------------------------------------
     // 2. AI CONFIGURATION
     // Get a free key from: https://console.groq.com/keys
